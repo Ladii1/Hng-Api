@@ -98,6 +98,55 @@ test("POST /api/profiles is idempotent for duplicate names", async () => {
   }
 });
 
+test("GET /api/profiles filters case-insensitively", async () => {
+  const server = await createTestServer();
+
+  try {
+    await server.request.post("/api/profiles").send({ name: "Ella" });
+
+    const response = await server.request.get("/api/profiles?gender=FEMALE&country_id=ng&age_group=adult");
+    assert.equal(response.status, 200);
+
+    const body = response.body;
+    assert.equal(body.count, 1);
+    assert.deepEqual(Object.keys(body.data[0]), ["id", "name", "gender", "age", "age_group", "country_id"]);
+  } finally {
+    await server.shutdown();
+  }
+});
+
+test("POST /api/profiles validates missing and invalid names", async () => {
+  const server = await createTestServer();
+
+  try {
+    const missingResponse = await server.request.post("/api/profiles").send({});
+    assert.equal(missingResponse.status, 400);
+
+    const invalidTypeResponse = await server.request.post("/api/profiles").send({ name: 123 });
+    assert.equal(invalidTypeResponse.status, 422);
+  } finally {
+    await server.shutdown();
+  }
+});
+
+test("POST /api/profiles returns 502 when Genderize data is invalid", async () => {
+  const server = await createTestServer({
+    genderize: { gender: null, probability: 0, count: 0 },
+  });
+
+  try {
+    const response = await server.request.post("/api/profiles").send({ name: "Ella" });
+
+    assert.equal(response.status, 502);
+    const body = response.body;
+    assert.deepEqual(body, {
+      status: "error",
+      message: "Genderize returned an invalid response",
+    });
+  } finally {
+    await server.shutdown();
+  }
+});
 
 
 
