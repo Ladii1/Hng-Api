@@ -81,7 +81,22 @@ test("POST /api/profiles creates and stores a profile", async () => {
   }
 });
 
+test("POST /api/profiles is idempotent for duplicate names", async () => {
+  const server = await createTestServer();
 
+  try {
+    await server.request.post("/api/profiles").send({ name: "Ella" });
+
+    const duplicateResponse = await server.request.post("/api/profiles").send({ name: "ELLA" });
+
+    assert.equal(duplicateResponse.status, 200);
+    const body = duplicateResponse.body;
+    assert.equal(body.message, "Profile already exists");
+    assert.equal(body.data.name, "ella");
+  } finally {
+    await server.shutdown();
+  }
+});
 
 
 
